@@ -93,6 +93,9 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 		case "property-change":
 			switch response.Name {
 			case "time-pos":
+				if response.Data == nil {
+					continue
+				}
 				data, ok := response.Data.(float64)
 				if !ok {
 					slog.Error("failed to parse time-pos data as float64", "line", line, "data", response.Data)
