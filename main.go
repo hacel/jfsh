@@ -59,6 +59,7 @@ func main() {
 			panic(err)
 		}
 		defer f.Close()
+		slog.SetLogLoggerLevel(slog.LevelDebug)
 		slog.Info("enabled debug logging")
 	} else {
 		log.SetOutput(io.Discard)

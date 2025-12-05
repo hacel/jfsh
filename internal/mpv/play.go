@@ -173,6 +173,8 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 			} else {
 				slog.Info("reported playback stopped", "item", item.GetName(), "pos", pos)
 			}
+		default:
+			slog.Debug("ignored", "line", line)
 		}
 	}
 	if err := mpv.scanner.Err(); err != nil {
