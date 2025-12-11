@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"runtime/debug"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/hacel/jfsh/internal/config"
@@ -59,7 +60,14 @@ func main() {
 			panic(err)
 		}
 		defer f.Close()
-		slog.SetLogLoggerLevel(slog.LevelDebug)
+		slog.SetDefault(
+			slog.New(
+				slog.NewJSONHandler(log.Writer(), &slog.HandlerOptions{Level: slog.LevelDebug, ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+					if a.Key == slog.TimeKey {
+						return slog.String(a.Key, a.Value.Time().Format(time.DateTime))
+					}
+					return a
+				}})))
 		slog.Info("enabled debug logging")
 	} else {
 		log.SetOutput(io.Discard)
