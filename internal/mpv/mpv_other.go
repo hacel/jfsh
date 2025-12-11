@@ -5,6 +5,7 @@ package mpv
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ func createMpv() (*mpv, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to create mpv: %w", err)
 	}
+	slog.Debug("created mpv", "socket", socket)
 
 	// Wait for socket to be created
 	var conn net.Conn
@@ -33,6 +35,7 @@ func createMpv() (*mpv, error) {
 		cmd.Process.Kill()
 		return nil, fmt.Errorf("failed to connect to mpv socket: %w", err)
 	}
+	slog.Debug("successfully connected to mpv", "socket", socket)
 	return &mpv{
 		conn:    conn,
 		scanner: bufio.NewScanner(conn),

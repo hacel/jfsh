@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
@@ -17,13 +18,13 @@ type request struct {
 	ID      int `json:"request_id,omitempty"`
 }
 
-type response struct {
-	Error      string `json:"error"`
+type message struct {
+	Error      string `json:"error,omitempty"`
 	ID         int    `json:"request_id,omitempty"`
 	Event      string `json:"event,omitempty"`
 	Name       string `json:"name,omitempty"`
 	Reason     string `json:"reason,omitempty"`
-	Data       any    `json:"data"`
+	Data       any    `json:"data,omitempty"`
 	PlaylistID int    `json:"playlist_entry_id,omitempty"`
 }
 
@@ -54,7 +55,7 @@ func (c *mpv) close() {
 }
 
 func (c *mpv) send(command []any) error {
-	req := request{Command: command}
+	req := request{Command: command, ID: rand.Intn(1000)}
 	data, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal mpv command: %w", err)
@@ -63,6 +64,7 @@ func (c *mpv) send(command []any) error {
 	if err != nil {
 		return fmt.Errorf("failed to write mpv command to socket: %w", err)
 	}
+	slog.Debug("sent", "request", req)
 	return nil
 }
 

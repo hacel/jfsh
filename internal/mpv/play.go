@@ -83,72 +83,76 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 		if line == "" {
 			continue
 		}
-		var response response
-		if err := json.Unmarshal([]byte(line), &response); err != nil {
-			slog.Error("failed to unmarshal response", "line", line, "err", err)
+		var msg message
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			slog.Error("failed to unmarshal mpv msg", "line", line, "err", err)
 			continue
 		}
+		logger := slog.With("msg", msg)
 
-		switch response.Event {
+		switch msg.Event {
 		case "property-change":
-			switch response.Name {
+			switch msg.Name {
 			case "time-pos":
-				if response.Data == nil {
+				if msg.Data == nil {
 					continue
 				}
-				data, ok := response.Data.(float64)
+				data, ok := msg.Data.(float64)
 				if !ok {
-					slog.Error("failed to parse time-pos data as float64", "line", line, "data", response.Data)
+					logger.Error("failed to parse time-pos data as float64")
 					continue
 				}
 				pos = data
 
 				if end := isInsideSkippableSegment(skippableSegments, pos); end != 0 {
 					if err := mpv.seekTo(end); err != nil {
-						slog.Error("failed to seek to end of skippable segment", "err", err)
+						logger.Error("failed to seek to end of skippable segment", "err", err)
 					} else {
-						slog.Info("seeked to end of skippable segment", "pos", end)
+						logger.Info("seeked to end of skippable segment", "pos", end)
 					}
 				}
 
 				// debounced progress reporting
 				if time.Since(lastProgressUpdate) > 3*time.Second {
 					if err := client.ReportPlaybackProgress(item, secondsToTicks(pos)); err != nil {
-						slog.Error("failed to report playback progress", "err", err)
+						logger.Error("failed to report playback progress", "err", err)
 						continue
 					}
-					slog.Info("reported progress", "item", item.GetName(), "pos", pos)
+					logger.Info("reported progress", "item", item.GetName(), "pos", pos)
 					lastProgressUpdate = time.Now()
 				}
 			}
 
 		case "start-file":
 			// figure out what item is being played
-			id := response.PlaylistID - 1
+			id := msg.PlaylistID - 1
 			if id >= len(playlistIDs) {
-				slog.Error("start-file event for unknown playlist id", "id", response.PlaylistID)
-				// user probably loaded something manually
-				return fmt.Errorf("start-file event for unknown playlist id: %d", response.PlaylistID)
+				logger.Error("start-file event for unknown playlist id")
+				return fmt.Errorf("start-file event for unknown playlist id: %d, did you load something manually?", msg.PlaylistID)
 			}
-			item = items[playlistIDs[response.PlaylistID-1]]
-			slog.Info("received", "event", response.Event, "playlist_id", response.PlaylistID, "index", playlistIDs[response.PlaylistID-1], "item", item.GetName())
+			item = items[playlistIDs[msg.PlaylistID-1]]
+			logger.Info("received", "index", playlistIDs[msg.PlaylistID-1], "item", item.GetName())
 
 			// report playback start
 			if err := client.ReportPlaybackStart(item, secondsToTicks(pos)); err != nil {
-				slog.Error("failed to report playback progress", "err", err)
+				logger.Error("failed to report playback progress", "err", err)
 			} else {
-				slog.Info("reported playback start", "item", item.GetName(), "pos", pos)
+				logger.Info("reported playback start", "item", item.GetName(), "pos", pos)
 			}
 
 			// get skippable segments
+			logger.Debug("requesting skippable segments", "types", skippableSegmentTypes)
 			segments, err := client.GetMediaSegments(item, skippableSegmentTypes)
 			if err != nil {
-				slog.Error("failed to get skippable segments", "err", err)
-			} else {
-				for start, end := range segments {
-					skippableSegments[ticksToSeconds(start)] = ticksToSeconds(end)
-				}
-				slog.Info("got skippable segments", "segments", segments)
+				logger.Error("failed to get skippable segments", "err", err)
+			}
+			if len(segments) == 0 {
+				logger.Info("no skippable segments found")
+			}
+			for start, end := range segments {
+				startSeconds, endSeconds := ticksToSeconds(start), ticksToSeconds(end)
+				skippableSegments[startSeconds] = endSeconds
+				logger.Info("added skippable segment", "start", start, "end", end)
 			}
 
 			// load external subtitles
@@ -156,25 +160,25 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 			for _, subtitle := range subtitles {
 				subtitleURL := client.Host + subtitle.Path
 				if err := mpv.addSubtitle(subtitleURL, subtitle.Title, subtitle.Language); err != nil {
-					slog.Error("failed to add subtitle", "err", err, "title", subtitle.Title, "language", subtitle.Language)
+					logger.Error("failed to add subtitle", "err", err, "title", subtitle.Title, "language", subtitle.Language)
 				} else {
-					slog.Info("added subtitle", "title", subtitle.Title, "language", subtitle.Language)
+					logger.Info("added subtitle", "title", subtitle.Title, "language", subtitle.Language)
 				}
 			}
 
 		case "seek":
-			slog.Info("received", "event", response.Event, "item", item.GetName())
+			logger.Info("received", "item", item.GetName())
 			lastProgressUpdate = time.Time{}
 
 		case "end-file", "shutdown":
-			slog.Info("received", "event", response.Event, "item", item.GetName())
+			logger.Info("received", "item", item.GetName())
 			if err := client.ReportPlaybackStopped(item, secondsToTicks(pos)); err != nil {
-				slog.Error("failed to report playback stopped", "err", err)
+				logger.Error("failed to report playback stopped", "err", err)
 			} else {
-				slog.Info("reported playback stopped", "item", item.GetName(), "pos", pos)
+				logger.Info("reported playback stopped", "item", item.GetName(), "pos", pos)
 			}
 		default:
-			slog.Debug("ignored", "line", line)
+			logger.Debug("ignored")
 		}
 	}
 	if err := mpv.scanner.Err(); err != nil {
