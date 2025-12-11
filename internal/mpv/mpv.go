@@ -3,6 +3,7 @@ package mpv
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -11,7 +12,54 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 )
+
+// isOldMpv returns true if mpv is older than 0.38.0
+func isOldMpv() bool {
+	output, err := exec.Command("mpv", "--version").CombinedOutput()
+	if err != nil {
+		slog.Debug("failed to get mpv version", "error", err)
+		return false
+	}
+	logger := slog.With("output", string(output))
+	idx := bytes.IndexByte(output, '\n')
+	if idx == -1 {
+		logger.Debug("failed to get mpv version")
+		return false
+	}
+	output = output[:idx]
+	fields := bytes.Fields(output)
+	if len(fields) < 2 {
+		logger.Debug("failed to get mpv version")
+		return false
+	}
+	version := string(fields[1])
+	version = strings.TrimPrefix(version, "v")
+	version = strings.Split(version, "-")[0]
+	slog.Debug("mpv version", "version", version)
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		logger.Debug("failed to get mpv version")
+		return false
+	}
+	target := []int{0, 38, 0}
+	for i := range 3 {
+		value, err := strconv.Atoi(parts[i])
+		if err != nil {
+			logger.Debug("failed to get mpv version")
+			return false
+		}
+		if value < target[i] {
+			slog.Warn("You're using an mpv version older than 0.38.0. When loading an episode, previous episodes will not be prepended to the playlist. Consider updating.", "version", version)
+			return true
+		}
+		if value > target[i] {
+			return false
+		}
+	}
+	return false
+}
 
 type request struct {
 	Command any `json:"command"`
@@ -33,6 +81,7 @@ type mpv struct {
 	scanner *bufio.Scanner
 	cmd     *exec.Cmd
 	socket  string
+	oldMpv  bool // true if mpv is older than 0.38.0
 }
 
 func (c *mpv) close() {
@@ -77,6 +126,10 @@ func (c *mpv) seekTo(pos float64) error {
 }
 
 func (c *mpv) prependFile(url, title string) error {
+	if c.oldMpv {
+		slog.Warn("mpv version is < 0.38, refusing to prepend file", "url", url, "title", title)
+		return nil
+	}
 	cmd := []any{"loadfile", url, "insert-at", 0, map[string]any{
 		"force-media-title": title,
 	}}
@@ -84,17 +137,25 @@ func (c *mpv) prependFile(url, title string) error {
 }
 
 func (c *mpv) appendFile(url, title string) error {
-	cmd := []any{"loadfile", url, "append", 0, map[string]any{
+	cmd := []any{"loadfile", url, "append"}
+	if !c.oldMpv {
+		cmd = append(cmd, 0)
+	}
+	cmd = append(cmd, map[string]any{
 		"force-media-title": title,
-	}}
+	})
 	return c.send(cmd)
 }
 
 func (c *mpv) playFile(url, title string, start float64) error {
-	cmd := []any{"loadfile", url, "replace", 0, map[string]any{
+	cmd := []any{"loadfile", url, "replace"}
+	if !c.oldMpv {
+		cmd = append(cmd, 0)
+	}
+	cmd = append(cmd, map[string]any{
 		"force-media-title": title,
 		"start":             strconv.FormatFloat(start, 'f', 6, 64),
-	}}
+	})
 	return c.send(cmd)
 }
 

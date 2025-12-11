@@ -41,5 +41,6 @@ func createMpv() (*mpv, error) {
 		scanner: bufio.NewScanner(conn),
 		cmd:     cmd,
 		socket:  socket,
+		oldMpv:  isOldMpv(),
 	}, nil
 }
