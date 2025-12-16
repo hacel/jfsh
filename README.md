@@ -20,6 +20,12 @@ Inspired by [jftui](https://github.com/Aanok/jftui).
 - A running [Jellyfin](https://jellyfin.org) instance.
 - [mpv](https://mpv.io) available in PATH.
 
+#### Install from AUR
+
+```sh
+yay jfsh
+```
+
 #### Download a release
 
 Download the latest pre-built binary for your platform from the [releases page](https://github.com/hacel/jfsh/releases/latest).
