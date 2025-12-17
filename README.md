@@ -22,8 +22,10 @@ Inspired by [jftui](https://github.com/Aanok/jftui).
 
 #### Install from AUR
 
+On Arch Linux, jfsh can be installed from the [AUR](https://aur.archlinux.org/packages/jfsh)
+
 ```sh
-yay jfsh
+yay -S jfsh
 ```
 
 #### Download a release
