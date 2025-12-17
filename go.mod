@@ -10,7 +10,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/ansi v0.10.1
 	github.com/google/uuid v1.6.0
-	github.com/sj14/jellyfin-go v0.3.3
+	github.com/sj14/jellyfin-go v0.4.2
 	github.com/spf13/pflag v1.0.7
 	github.com/spf13/viper v1.20.1
 )
