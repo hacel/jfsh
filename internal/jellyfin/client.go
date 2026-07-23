@@ -9,22 +9,29 @@ import (
 	"github.com/sj14/jellyfin-go/api"
 )
 
-type Client struct {
-	api    *api.APIClient
-	Host   string
-	UserID string
-	Token  string
-}
+// Client is the generated Jellyfin API client under the application's package name.
+type Client api.APIClient
 
-// get token and user id
-func authorize(host, username, password, device, deviceID, version string) (token, userID string, err error) {
-	authHeader := fmt.Sprintf("MediaBrowser Client=\"jfsh\", Device=%q, DeviceId=%q, Version=%q", device, deviceID, version)
+func newClient(host, authHeader string) (*Client, error) {
+	host, err := NormalizeHost(host)
+	if err != nil {
+		return nil, err
+	}
 	config := &api.Configuration{
 		Servers:       api.ServerConfigurations{{URL: host}},
 		DefaultHeader: map[string]string{"Authorization": authHeader},
 	}
-	cl := api.NewAPIClient(config)
-	res, _, err := cl.UserAPI.AuthenticateUserByName(context.Background()).AuthenticateUserByName(api.AuthenticateUserByName{
+	return (*Client)(api.NewAPIClient(config)), nil
+}
+
+// Authenticate exchanges Jellyfin user credentials for an access token and user ID.
+func Authenticate(host, username, password, device, deviceID, version string) (token, userID string, err error) {
+	authHeader := fmt.Sprintf("MediaBrowser Client=\"jfsh\", Device=%q, DeviceId=%q, Version=%q", device, deviceID, version)
+	client, err := newClient(host, authHeader)
+	if err != nil {
+		return "", "", err
+	}
+	res, _, err := client.UserAPI.AuthenticateUserByName(context.Background()).AuthenticateUserByName(api.AuthenticateUserByName{
 		Username: *api.NewNullableString(&username),
 		Pw:       *api.NewNullableString(&password),
 	}).Execute()
@@ -37,25 +44,8 @@ func authorize(host, username, password, device, deviceID, version string) (toke
 	return
 }
 
-func NewClient(host, username, password, device, deviceID, version, token, userID string) (*Client, error) {
-	host, err := normalizeHost(host)
-	if err != nil {
-		return nil, err
-	}
-	if token == "" || userID == "" {
-		newToken, newUserID, err := authorize(host, username, password, device, deviceID, version)
-		if err != nil {
-			return nil, err
-		}
-		token = newToken
-		userID = newUserID
-	}
-
+// NewClient creates an authenticated Jellyfin API client.
+func NewClient(host, device, deviceID, version, token string) (*Client, error) {
 	authHeader := fmt.Sprintf("MediaBrowser Client=\"jfsh\", Device=%q, DeviceId=%q, Version=%q, Token=%q", device, deviceID, version, token)
-	config := &api.Configuration{
-		Servers:       api.ServerConfigurations{{URL: host}},
-		DefaultHeader: map[string]string{"Authorization": authHeader},
-	}
-	apiClient := api.NewAPIClient(config)
-	return &Client{api: apiClient, Host: host, UserID: userID, Token: token}, nil
+	return newClient(host, authHeader)
 }

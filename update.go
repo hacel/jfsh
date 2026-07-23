@@ -16,12 +16,12 @@ type playbackStopped struct {
 }
 
 func (m *model) playItem() tea.Cmd {
-	client := m.client
+	session := m.session
 	item := m.items[m.currentItem]
 	if jellyfin.IsEpisode(item) {
 		return func() tea.Msg {
 			// get all episodes of the series and find the index of selected episode
-			items, err := client.GetEpisodes(item)
+			items, err := session.Client.GetEpisodes(item)
 			if err != nil {
 				return err
 			}
@@ -29,14 +29,14 @@ func (m *model) playItem() tea.Cmd {
 				return item.GetId() == i.GetId()
 			})
 			idx = max(0, idx) // sanity check
-			if err := mpv.Play(client, items, idx); err != nil {
+			if err := mpv.Play(session, items, idx); err != nil {
 				return playbackStopped{err}
 			}
 			return playbackStopped{nil}
 		}
 	}
 	return func() tea.Msg {
-		if err := mpv.Play(client, []jellyfin.Item{item}, 0); err != nil {
+		if err := mpv.Play(session, []jellyfin.Item{item}, 0); err != nil {
 			return playbackStopped{err}
 		}
 		return playbackStopped{nil}
@@ -49,18 +49,18 @@ type toggleWatchedResult struct {
 
 func (m *model) toggleWatchedStatus() tea.Cmd {
 	m.loading = true
-	client := m.client
+	session := m.session
 	item := m.items[m.currentItem]
 	if jellyfin.Watched(item) {
 		return func() tea.Msg {
-			if err := client.MarkAsUnwatched(item); err != nil {
+			if err := session.Client.MarkAsUnwatched(item); err != nil {
 				return toggleWatchedResult{err}
 			}
 			return toggleWatchedResult{nil}
 		}
 	} else {
 		return func() tea.Msg {
-			if err := client.MarkAsWatched(item); err != nil {
+			if err := session.Client.MarkAsWatched(item); err != nil {
 				return toggleWatchedResult{err}
 			}
 			return toggleWatchedResult{nil}
@@ -75,10 +75,10 @@ type fetchItemsResult struct {
 
 func (m *model) fetchItems() tea.Cmd {
 	m.loading = true
-	client := m.client
+	session := m.session
 	if m.currentSeries != nil {
 		return func() tea.Msg {
-			items, err := client.GetEpisodes(*m.currentSeries)
+			items, err := session.Client.GetEpisodes(*m.currentSeries)
 			if err != nil {
 				return fetchItemsResult{nil, err}
 			}
@@ -88,7 +88,7 @@ func (m *model) fetchItems() tea.Cmd {
 	switch m.currentTab {
 	case Resume:
 		return func() tea.Msg {
-			items, err := client.GetResume()
+			items, err := session.Client.GetResume(session.UserID)
 			if err != nil {
 				return fetchItemsResult{nil, err}
 			}
@@ -96,7 +96,7 @@ func (m *model) fetchItems() tea.Cmd {
 		}
 	case NextUp:
 		return func() tea.Msg {
-			items, err := client.GetNextUp()
+			items, err := session.Client.GetNextUp()
 			if err != nil {
 				return fetchItemsResult{nil, err}
 			}
@@ -104,7 +104,7 @@ func (m *model) fetchItems() tea.Cmd {
 		}
 	case RecentlyAdded:
 		return func() tea.Msg {
-			items, err := client.GetRecentlyAdded()
+			items, err := session.Client.GetRecentlyAdded()
 			if err != nil {
 				return fetchItemsResult{nil, err}
 			}
@@ -116,7 +116,7 @@ func (m *model) fetchItems() tea.Cmd {
 			if query == "" {
 				return fetchItemsResult{nil, nil}
 			}
-			items, err := client.Search(query)
+			items, err := session.Client.Search(query)
 			if err != nil {
 				return fetchItemsResult{nil, err}
 			}

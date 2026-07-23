@@ -31,7 +31,7 @@ func GetResumePosition(item Item) (ticks int64) {
 }
 
 func GetStreamingURL(host string, item Item) (string, error) {
-	host, err := normalizeHost(host)
+	host, err := NormalizeHost(host)
 	if err != nil {
 		return "", err
 	}

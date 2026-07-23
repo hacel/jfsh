@@ -2,28 +2,20 @@ package config
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/hacel/jfsh/internal/jellyfin"
-	"github.com/spf13/viper"
 )
 
-func (m *model) initClient() tea.Cmd {
-	host, username, password := m.inputs[hostInput].Value(), m.inputs[usernameInput].Value(), m.inputs[passwordInput].Value()
-	device, deviceID, clientVersion, token, userID := viper.GetString("device"), viper.GetString("device_id"), viper.GetString("client_version"), viper.GetString("token"), viper.GetString("user_id")
+func (m *model) initSession() tea.Cmd {
+	currentSettings := m.settings
+	currentSettings.Host = m.inputs[hostInput].Value()
+	currentSettings.Username = m.inputs[usernameInput].Value()
+	currentState, clientVersion, device := m.state, m.clientVersion, m.device
+	password := m.inputs[passwordInput].Value()
 	return func() tea.Msg {
-		client, err := jellyfin.NewClient(
-			host,
-			username,
-			password,
-			device,
-			deviceID,
-			clientVersion,
-			token,
-			userID,
-		)
+		session, err := createSession(currentSettings, currentState, clientVersion, device, password)
 		if err != nil {
 			return err
 		}
-		return client
+		return session
 	}
 }
 
@@ -38,19 +30,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		return m, nil
 
-	case *jellyfin.Client:
-		host, username, password := m.inputs[hostInput].Value(), m.inputs[usernameInput].Value(), m.inputs[passwordInput].Value()
-		viper.Set("host", host)
-		viper.Set("username", username)
-		viper.Set("password", password)
-		viper.Set("user_id", msg.UserID)
-		viper.Set("token", msg.Token)
-		if err := viper.WriteConfig(); err != nil {
-			if err := viper.SafeWriteConfig(); err != nil {
-				panic(err)
+	case *Session:
+		host, username := m.inputs[hostInput].Value(), m.inputs[usernameInput].Value()
+		if host != m.settings.Host || username != m.settings.Username {
+			m.settings.Host = host
+			m.settings.Username = username
+			if err := writeSettings(m.configPath, m.settings); err != nil {
+				m.err = err
+				return m, nil
 			}
 		}
-		m.client = msg
+
+		// Persist authentication separately so declarative settings remain read-only.
+		m.state.Token = msg.Token
+		m.state.UserID = msg.UserID
+		if err := writeState(m.statePath, m.state); err != nil {
+			m.err = err
+			return m, nil
+		}
+		m.session = msg
 		return m, tea.Quit
 
 	case tea.KeyMsg:
@@ -69,7 +67,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					valid = false
 				}
 				if valid {
-					return m, m.initClient()
+					return m, m.initSession()
 				}
 			}
 			m.currentInput = (m.currentInput + 1) % len(m.inputs)

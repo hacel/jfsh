@@ -39,22 +39,21 @@ func TestNormalizeHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := normalizeHost(test.host)
+			got, err := NormalizeHost(test.host)
 			if test.wantErr {
 				if err == nil {
-					t.Fatalf("normalizeHost(%q) returned nil error", test.host)
+					t.Fatalf("NormalizeHost(%q) returned nil error", test.host)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("normalizeHost(%q) returned error: %v", test.host, err)
+				t.Fatalf("NormalizeHost(%q) returned error: %v", test.host, err)
 			}
 			if got != test.want {
-				t.Fatalf("normalizeHost(%q) = %q, want %q", test.host, got, test.want)
+				t.Fatalf("NormalizeHost(%q) = %q, want %q", test.host, got, test.want)
 			}
 		})
 	}

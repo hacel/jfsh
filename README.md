@@ -28,6 +28,23 @@ On Arch Linux, jfsh can be installed from the [AUR](https://aur.archlinux.org/pa
 yay -S jfsh
 ```
 
+#### Install with Nix
+
+Run jfsh directly from GitHub:
+
+```sh
+nix run github:hacel/jfsh
+```
+
+Or install it into your user profile:
+
+```sh
+nix profile install github:hacel/jfsh
+```
+
+The Nix package uses an existing `mpv` from `PATH` when available and provides
+the packaged `mpv` as a fallback.
+
 #### Download a release
 
 Download the latest pre-built binary for your platform from the [releases page](https://github.com/hacel/jfsh/releases/latest).
@@ -74,14 +91,68 @@ By default, the configuration file is stored in `$XDG_CONFIG_HOME/jfsh/jfsh.yaml
 ```yaml
 host: http://localhost:8096
 username: me
-password: hunter2
 device: mycomputer # Device name to report to jellyfin (default: hostname)
+password_file: /run/secrets/jfsh-password # Optional runtime secret file
 skip_segments: # Segments to automatically skip (default: [])
   - Recap
   - Preview
   - Intro
   - Outro
 ```
+
+When no reusable token or `password_file` is available, jfsh prompts for the
+password. Passwords are never stored by jfsh. Authentication tokens and the
+generated device ID are stored in `$XDG_STATE_HOME/jfsh/state.yaml`.
+
+### Home Manager
+
+The flake exports `homeManagerModules.default`. Import it into a standalone
+Home Manager configuration or under `home-manager.users.<name>` in NixOS:
+
+```nix
+{
+  imports = [ inputs.jfsh.homeManagerModules.default ];
+
+  programs.jfsh = {
+    enable = true;
+
+    settings = {
+      host = "https://jellyfin.example.com";
+      username = "me";
+      device = "mycomputer";
+      skipSegments = [
+        "Recap"
+        "Intro"
+        "Outro"
+      ];
+    };
+
+    passwordFile = "/run/secrets/jfsh-password";
+  };
+}
+```
+
+Add jfsh to the consuming flake and share its existing inputs:
+
+```nix
+inputs.jfsh = {
+  url = "github:hacel/jfsh";
+  inputs.nixpkgs.follows = "nixpkgs";
+  inputs.home-manager.follows = "home-manager";
+};
+```
+
+`passwordFile` must be an absolute runtime path. It is a string rather than a
+Nix path so the password is not copied into the Nix store. The file can be
+provided by a secret manager such as sops-nix or agenix. Omit it to enter the
+password interactively on first authentication.
+
+### Migrating existing configuration
+
+The legacy `password`, `token`, `user_id`, `device_id`, and `client_version`
+configuration keys are ignored. Remove them manually, especially the plaintext
+`password`, and authenticate once to create the new state file. Existing
+`host`, `username`, `device`, and `skip_segments` settings continue to work.
 
 ### Segment skipping
 

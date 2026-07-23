@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func normalizeHost(host string) (string, error) {
+func NormalizeHost(host string) (string, error) {
 	host = strings.TrimSpace(host)
 	u, err := url.Parse(host)
 	if err != nil {

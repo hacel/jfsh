@@ -6,9 +6,9 @@ import (
 	"github.com/sj14/jellyfin-go/api"
 )
 
-func (c *Client) GetResume() ([]Item, error) {
-	res, _, err := c.api.ItemsAPI.GetResumeItems(context.Background()).
-		UserId(c.UserID).
+func (c *Client) GetResume(userID string) ([]Item, error) {
+	res, _, err := c.ItemsAPI.GetResumeItems(context.Background()).
+		UserId(userID).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		Execute()
 	if err != nil {
@@ -18,7 +18,7 @@ func (c *Client) GetResume() ([]Item, error) {
 }
 
 func (c *Client) GetNextUp() ([]Item, error) {
-	res, _, err := c.api.TvShowsAPI.GetNextUp(context.Background()).
+	res, _, err := c.TvShowsAPI.GetNextUp(context.Background()).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		EnableTotalRecordCount(false).
 		DisableFirstEpisode(false).
@@ -32,7 +32,7 @@ func (c *Client) GetNextUp() ([]Item, error) {
 }
 
 func (c *Client) GetRecentlyAdded() ([]Item, error) {
-	res, _, err := c.api.ItemsAPI.GetItems(context.Background()).
+	res, _, err := c.ItemsAPI.GetItems(context.Background()).
 		Recursive(true).
 		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES}).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
@@ -51,7 +51,7 @@ func (c *Client) GetEpisodes(item Item) ([]Item, error) {
 	if item.GetType() == api.BASEITEMKIND_SERIES {
 		seriesID = item.GetId()
 	}
-	res, _, err := c.api.TvShowsAPI.GetEpisodes(context.Background(), seriesID).
+	res, _, err := c.TvShowsAPI.GetEpisodes(context.Background(), seriesID).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		Execute()
 	if err != nil {
@@ -61,7 +61,7 @@ func (c *Client) GetEpisodes(item Item) ([]Item, error) {
 }
 
 func (c *Client) Search(query string) ([]Item, error) {
-	res, _, err := c.api.ItemsAPI.GetItems(context.Background()).
+	res, _, err := c.ItemsAPI.GetItems(context.Background()).
 		SearchTerm(query).
 		Recursive(true).
 		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES}).
@@ -75,7 +75,7 @@ func (c *Client) Search(query string) ([]Item, error) {
 }
 
 func (c *Client) ReportPlaybackStart(item Item, ticks int64) error {
-	_, err := c.api.PlaystateAPI.ReportPlaybackStart(context.Background()).PlaybackStartInfo(api.PlaybackStartInfo{
+	_, err := c.PlaystateAPI.ReportPlaybackStart(context.Background()).PlaybackStartInfo(api.PlaybackStartInfo{
 		ItemId:        item.Id,
 		PositionTicks: *api.NewNullableInt64(&ticks),
 	}).Execute()
@@ -83,7 +83,7 @@ func (c *Client) ReportPlaybackStart(item Item, ticks int64) error {
 }
 
 func (c *Client) ReportPlaybackStopped(item Item, ticks int64) error {
-	_, err := c.api.PlaystateAPI.ReportPlaybackStopped(context.Background()).PlaybackStopInfo(api.PlaybackStopInfo{
+	_, err := c.PlaystateAPI.ReportPlaybackStopped(context.Background()).PlaybackStopInfo(api.PlaybackStopInfo{
 		ItemId:        item.Id,
 		PositionTicks: *api.NewNullableInt64(&ticks),
 	}).Execute()
@@ -91,7 +91,7 @@ func (c *Client) ReportPlaybackStopped(item Item, ticks int64) error {
 }
 
 func (c *Client) ReportPlaybackProgress(item Item, ticks int64) error {
-	_, err := c.api.PlaystateAPI.ReportPlaybackProgress(context.Background()).PlaybackProgressInfo(api.PlaybackProgressInfo{
+	_, err := c.PlaystateAPI.ReportPlaybackProgress(context.Background()).PlaybackProgressInfo(api.PlaybackProgressInfo{
 		ItemId:        item.Id,
 		PositionTicks: *api.NewNullableInt64(&ticks),
 	}).Execute()
@@ -111,7 +111,7 @@ func (c *Client) GetMediaSegments(item Item, types []string) (map[int64]int64, e
 	for i, t := range types {
 		mediaSegmentTypes[i] = api.MediaSegmentType(t)
 	}
-	res, _, err := c.api.MediaSegmentsAPI.GetItemSegments(context.Background(), item.GetId()).IncludeSegmentTypes(mediaSegmentTypes).Execute()
+	res, _, err := c.MediaSegmentsAPI.GetItemSegments(context.Background(), item.GetId()).IncludeSegmentTypes(mediaSegmentTypes).Execute()
 	if err != nil {
 		return nil, err
 	}
@@ -123,11 +123,11 @@ func (c *Client) GetMediaSegments(item Item, types []string) (map[int64]int64, e
 }
 
 func (c *Client) MarkAsWatched(item Item) error {
-	_, _, err := c.api.PlaystateAPI.MarkPlayedItem(context.Background(), item.GetId()).Execute()
+	_, _, err := c.PlaystateAPI.MarkPlayedItem(context.Background(), item.GetId()).Execute()
 	return err
 }
 
 func (c *Client) MarkAsUnwatched(item Item) error {
-	_, _, err := c.api.PlaystateAPI.MarkUnplayedItem(context.Background(), item.GetId()).Execute()
+	_, _, err := c.PlaystateAPI.MarkUnplayedItem(context.Background(), item.GetId()).Execute()
 	return err
 }

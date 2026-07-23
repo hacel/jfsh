@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/hacel/jfsh/internal/config"
 	"github.com/hacel/jfsh/internal/jellyfin"
 )
 
@@ -28,7 +29,7 @@ type model struct {
 	width  int
 	height int
 
-	client *jellyfin.Client
+	session *config.Session
 
 	currentTab  tab
 	searchInput textinput.Model
@@ -49,7 +50,7 @@ type model struct {
 	loading bool
 }
 
-func initialModel(client *jellyfin.Client) model {
+func initialModel(session *config.Session) model {
 	searchInput := textinput.New()
 	searchInput.Prompt = "Search: "
 	searchInput.Width = 40
@@ -61,7 +62,7 @@ func initialModel(client *jellyfin.Client) model {
 	m := model{
 		keyMap:      defaultKeyMap(),
 		help:        help.New(),
-		client:      client,
+		session:     session,
 		searchInput: searchInput,
 		filterInput: filterInput,
 		spinner:     spinner.New(spinner.WithSpinner(spinner.Dot)),

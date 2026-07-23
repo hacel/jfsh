@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/hacel/jfsh/internal/config"
 	"github.com/hacel/jfsh/internal/jellyfin"
-	"github.com/spf13/viper"
 )
 
 func secondsToTicks(seconds float64) int64 {
@@ -28,7 +28,7 @@ func isInsideSkippableSegment(segments map[float64]float64, pos float64) float64
 	return 0
 }
 
-func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
+func Play(session *config.Session, items []jellyfin.Item, index int) error {
 	mpv, err := createMpv()
 	if err != nil {
 		return fmt.Errorf("failed to create mpv client: %w", err)
@@ -45,7 +45,7 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 	playlistIDs := make([]int, 0, len(items))
 
 	// load file specified by index
-	url, err := jellyfin.GetStreamingURL(client.Host, items[index])
+	url, err := jellyfin.GetStreamingURL(session.Host, items[index])
 	if err != nil {
 		return fmt.Errorf("failed to build streaming url: %w", err)
 	}
@@ -58,7 +58,7 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 
 	// append to playlist the files after the index
 	for i := index + 1; i < len(items); i++ {
-		url, err := jellyfin.GetStreamingURL(client.Host, items[i])
+		url, err := jellyfin.GetStreamingURL(session.Host, items[i])
 		if err != nil {
 			slog.Error("failed to build streaming url", "err", err, "item", items[i].GetName())
 			continue
@@ -72,7 +72,7 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 
 	// prepend to playlist the files before the index
 	for i := index - 1; i >= 0; i-- {
-		url, err := jellyfin.GetStreamingURL(client.Host, items[i])
+		url, err := jellyfin.GetStreamingURL(session.Host, items[i])
 		if err != nil {
 			slog.Error("failed to build streaming url", "err", err, "item", items[i].GetName())
 			continue
@@ -87,7 +87,6 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 	pos := float64(0)
 	lastProgressUpdate := time.Now()
 	item := items[index]
-	skippableSegmentTypes := viper.GetStringSlice("skip_segments")
 	skippableSegments := make(map[float64]float64)
 	for mpv.scanner.Scan() {
 		line := mpv.scanner.Text()
@@ -125,7 +124,7 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 
 				// debounced progress reporting
 				if time.Since(lastProgressUpdate) > 3*time.Second {
-					if err := client.ReportPlaybackProgress(item, secondsToTicks(pos)); err != nil {
+					if err := session.Client.ReportPlaybackProgress(item, secondsToTicks(pos)); err != nil {
 						logger.Error("failed to report playback progress", "err", err)
 						continue
 					}
@@ -145,15 +144,15 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 			logger.Info("received", "index", playlistIDs[msg.PlaylistID-1], "item", item.GetName())
 
 			// report playback start
-			if err := client.ReportPlaybackStart(item, secondsToTicks(pos)); err != nil {
+			if err := session.Client.ReportPlaybackStart(item, secondsToTicks(pos)); err != nil {
 				logger.Error("failed to report playback progress", "err", err)
 			} else {
 				logger.Info("reported playback start", "item", item.GetName(), "pos", pos)
 			}
 
 			// get skippable segments
-			logger.Debug("requesting skippable segments", "types", skippableSegmentTypes)
-			segments, err := client.GetMediaSegments(item, skippableSegmentTypes)
+			logger.Debug("requesting skippable segments", "types", session.SkipSegments)
+			segments, err := session.Client.GetMediaSegments(item, session.SkipSegments)
 			if err != nil {
 				logger.Error("failed to get skippable segments", "err", err)
 			}
@@ -169,7 +168,7 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 			// load external subtitles
 			subtitles := jellyfin.GetExternalSubtitleStreams(item)
 			for _, subtitle := range subtitles {
-				subtitleURL := client.Host + subtitle.Path
+				subtitleURL := session.Host + subtitle.Path
 				if err := mpv.addSubtitle(subtitleURL, subtitle.Title, subtitle.Language); err != nil {
 					logger.Error("failed to add subtitle", "err", err, "title", subtitle.Title, "language", subtitle.Language)
 				} else {
@@ -183,7 +182,7 @@ func Play(client *jellyfin.Client, items []jellyfin.Item, index int) error {
 
 		case "end-file", "shutdown":
 			logger.Info("received", "item", item.GetName())
-			if err := client.ReportPlaybackStopped(item, secondsToTicks(pos)); err != nil {
+			if err := session.Client.ReportPlaybackStopped(item, secondsToTicks(pos)); err != nil {
 				logger.Error("failed to report playback stopped", "err", err)
 			} else {
 				logger.Info("reported playback stopped", "item", item.GetName(), "pos", pos)

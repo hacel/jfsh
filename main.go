@@ -30,6 +30,7 @@ func main() {
 	}
 
 	cfgPath := pflag.StringP("config", "c", filepath.Join(xdg.ConfigHome, "jfsh", "jfsh.yaml"), "config file path")
+	statePath := pflag.String("state", filepath.Join(xdg.StateHome, "jfsh", "state.yaml"), "state file path")
 	debugPath := pflag.StringP("debug", "d", "", "debug log file path (enables debug logging)")
 	printVersion := pflag.BoolP("version", "v", false, "show version")
 	help := pflag.BoolP("help", "h", false, "show help")
@@ -73,15 +74,15 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
-	// first off, run a side bubbletea model that takes care of configuration and initializing the api client
-	client := config.Run(version, *cfgPath)
-	if client == nil {
+	// First, load configuration and initialize the authenticated application session.
+	session := config.Run(version, *cfgPath, *statePath)
+	if session == nil {
 		// err handling should happen inside the config model, this means the user quit
 		return
 	}
 
 	// now we can run the main bubbletea model
-	p := tea.NewProgram(initialModel(client), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(session), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		panic(err)
 	}
