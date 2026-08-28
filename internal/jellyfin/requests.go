@@ -34,7 +34,7 @@ func (c *Client) GetNextUp() ([]Item, error) {
 func (c *Client) GetRecentlyAdded() ([]Item, error) {
 	res, _, err := c.ItemsAPI.GetItems(context.Background()).
 		Recursive(true).
-		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES}).
+		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES, api.BASEITEMKIND_VIDEO}).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		Limit(100).
 		SortBy([]api.ItemSortBy{api.ITEMSORTBY_DATE_CREATED}).
@@ -64,7 +64,7 @@ func (c *Client) Search(query string) ([]Item, error) {
 	res, _, err := c.ItemsAPI.GetItems(context.Background()).
 		SearchTerm(query).
 		Recursive(true).
-		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES}).
+		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES, api.BASEITEMKIND_VIDEO}).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		Limit(100).
 		Execute()
