@@ -2,37 +2,47 @@ package jellyfin
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
 
 	"github.com/sj14/jellyfin-go/api"
 )
 
-func (c *Client) GetResume(userID string) ([]Item, error) {
-	res, _, err := c.ItemsAPI.GetResumeItems(context.Background()).
-		UserId(userID).
-		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
-		Execute()
+func itemQueryResult(operation string, res *api.BaseItemDtoQueryResult, response *http.Response, err error) ([]Item, error) {
 	if err != nil {
+		attrs := []any{"operation", operation, "error_type", fmt.Sprintf("%T", err)}
+		if response != nil {
+			attrs = append(attrs, "status_code", response.StatusCode)
+		}
+		slog.Error("item query failed", attrs...)
 		return nil, err
 	}
+	slog.Debug("item query completed", "operation", operation, "item_count", len(res.Items))
 	return res.Items, nil
 }
 
+func (c *Client) GetResume(userID string) ([]Item, error) {
+	res, response, err := c.ItemsAPI.GetResumeItems(context.Background()).
+		UserId(userID).
+		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
+		Execute()
+	return itemQueryResult("resume", res, response, err)
+}
+
 func (c *Client) GetNextUp() ([]Item, error) {
-	res, _, err := c.TvShowsAPI.GetNextUp(context.Background()).
+	res, response, err := c.TvShowsAPI.GetNextUp(context.Background()).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		EnableTotalRecordCount(false).
 		DisableFirstEpisode(false).
 		EnableResumable(false).
 		EnableRewatching(false).
 		Execute()
-	if err != nil {
-		return nil, err
-	}
-	return res.Items, nil
+	return itemQueryResult("next_up", res, response, err)
 }
 
 func (c *Client) GetRecentlyAdded() ([]Item, error) {
-	res, _, err := c.ItemsAPI.GetItems(context.Background()).
+	res, response, err := c.ItemsAPI.GetItems(context.Background()).
 		Recursive(true).
 		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES, api.BASEITEMKIND_VIDEO}).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
@@ -40,10 +50,7 @@ func (c *Client) GetRecentlyAdded() ([]Item, error) {
 		SortBy([]api.ItemSortBy{api.ITEMSORTBY_DATE_CREATED}).
 		SortOrder([]api.SortOrder{api.SORTORDER_DESCENDING}).
 		Execute()
-	if err != nil {
-		return nil, err
-	}
-	return res.Items, nil
+	return itemQueryResult("recently_added", res, response, err)
 }
 
 func (c *Client) GetEpisodes(item Item) ([]Item, error) {
@@ -51,27 +58,21 @@ func (c *Client) GetEpisodes(item Item) ([]Item, error) {
 	if item.GetType() == api.BASEITEMKIND_SERIES {
 		seriesID = item.GetId()
 	}
-	res, _, err := c.TvShowsAPI.GetEpisodes(context.Background(), seriesID).
+	res, response, err := c.TvShowsAPI.GetEpisodes(context.Background(), seriesID).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		Execute()
-	if err != nil {
-		return nil, err
-	}
-	return res.Items, nil
+	return itemQueryResult("episodes", res, response, err)
 }
 
 func (c *Client) Search(query string) ([]Item, error) {
-	res, _, err := c.ItemsAPI.GetItems(context.Background()).
+	res, response, err := c.ItemsAPI.GetItems(context.Background()).
 		SearchTerm(query).
 		Recursive(true).
 		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_SERIES, api.BASEITEMKIND_VIDEO}).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		Limit(100).
 		Execute()
-	if err != nil {
-		return nil, err
-	}
-	return res.Items, nil
+	return itemQueryResult("search", res, response, err)
 }
 
 func (c *Client) ReportPlaybackStart(item Item, ticks int64) error {
