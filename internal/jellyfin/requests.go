@@ -25,6 +25,7 @@ func itemQueryResult(operation string, res *api.BaseItemDtoQueryResult, response
 func (c *Client) GetResume(userID string) ([]Item, error) {
 	res, response, err := c.ItemsAPI.GetResumeItems(context.Background()).
 		UserId(userID).
+		IncludeItemTypes([]api.BaseItemKind{api.BASEITEMKIND_MOVIE, api.BASEITEMKIND_EPISODE, api.BASEITEMKIND_VIDEO}).
 		Fields([]api.ItemFields{api.ITEMFIELDS_MEDIA_STREAMS}).
 		Execute()
 	return itemQueryResult("resume", res, response, err)
